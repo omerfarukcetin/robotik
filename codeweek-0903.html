@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bilim ve Teknoloji Haftası - 10 Seviyeli Macera</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap');
+        
+        body {
+            font-family: 'Quicksand', sans-serif;
+            background-color: #f0f4f8;
+            user-select: none;
+        }
+
+        /* Level Node Styling */
+        .level-node {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+        }
+
+        .level-node.locked {
+            background-color: #cbd5e1 !important;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .level-node.current {
+            transform: scale(1.2);
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.5);
+            border: 3px solid #4f46e5;
+        }
+
+        /* Grid Styling */
+        .grid-cell {
+            aspect-ratio: 1;
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .grid-cell.obstacle { background-color: #64748b; color: #f1f5f9; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
+        .grid-cell.target { background: radial-gradient(circle, #e0f2fe 0%, #7dd3fc 100%); border-color: #0ea5e9; }
+
+        .ghost-dot {
+            width: 10px;
+            height: 10px;
+            background-color: #6366f1;
+            border-radius: 50%;
+            opacity: 0.3;
+            position: absolute;
+            z-index: 10;
+        }
+
+        .ghost-error {
+            color: #ef4444;
+            font-size: 0.9rem;
+            opacity: 0.6;
+            position: absolute;
+            z-index: 10;
+        }
+
+        /* Code Blocks */
+        .code-block {
+            background: #6366f1;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 8px;
+            margin: 2px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: bold;
+            font-size: 0.8rem;
+            animation: popIn 0.3s ease-out;
+            border-bottom: 3px solid #4338ca;
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .robot-part {
+            cursor: pointer;
+            transition: fill 0.3s;
+            stroke: #1e293b;
+            stroke-width: 2;
+        }
+
+        .color-dot {
+            width: 45px;
+            height: 45px;
+            border-radius: 12px;
+            cursor: pointer;
+            border: 4px solid white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s;
+        }
+
+        .color-dot.active {
+            transform: translateY(-5px) scale(1.1);
+            border-color: #1e293b;
+        }
+
+        .success-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.96);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            border-radius: 24px;
+            backdrop-filter: blur(4px);
+        }
+
+        .logic-label {
+            background: #1e293b;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            margin-top: 5px;
+        }
+
+        .message-box {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            border-radius: 12px;
+            color: white;
+            font-weight: bold;
+            z-index: 2000;
+            display: none;
+            box-shadow: 0 15px 20px -5px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-indigo-50 pb-10">
+
+    <div id="message" class="message-box"></div>
+
+    <header class="bg-white border-b-4 border-indigo-200 p-3 sticky top-0 z-40">
+        <div class="max-w-5xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="bg-indigo-600 p-2 rounded-xl text-white shadow-lg">
+                    <i class="fas fa-microchip text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-slate-800 leading-none">Bilim ve Teknoloji</h1>
+                    <span class="text-[10px] text-indigo-500 font-bold uppercase tracking-widest">Etkinlik Portalı</span>
+                </div>
+            </div>
+            <div class="bg-yellow-100 border-2 border-yellow-400 px-3 py-1 rounded-xl flex items-center gap-2">
+                <i class="fas fa-star text-yellow-600 text-sm"></i>
+                <span class="font-bold text-yellow-800 text-sm" id="total-score">0 Puan</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto mt-4 px-4">
+        
+        <!-- Tab Navigation -->
+        <div class="flex gap-2 mb-4 bg-white p-2 rounded-2xl border border-white shadow-sm overflow-x-auto">
+            <button onclick="switchTab('frog')" id="tab-frog" class="flex-1 min-w-[100px] py-3 rounded-xl font-bold flex flex-col items-center gap-1 transition-all bg-indigo-600 text-white shadow-md">
+                <i class="fas fa-terminal"></i><span class="text-[10px]">KODLAMA</span>
+            </button>
+            <button onclick="switchTab('shapes')" id="tab-shapes" class="flex-1 min-w-[100px] py-3 rounded-xl font-bold flex flex-col items-center gap-1 transition-all text-slate-500 hover:bg-white">
+                <i class="fas fa-robot"></i><span class="text-[10px]">TASARIM</span>
+            </button>
+            <button onclick="switchTab('logic')" id="tab-logic" class="flex-1 min-w-[100px] py-3 rounded-xl font-bold flex flex-col items-center gap-1 transition-all text-slate-500 hover:bg-white">
+                <i class="fas fa-key"></i><span class="text-[10px]">MANTIK</span>
+            </button>
+        </div>
+
+        <!-- Level Progress Bar (10 Levels) -->
+        <div class="bg-white rounded-2xl p-3 mb-6 shadow-sm border border-white overflow-x-auto">
+            <div class="flex items-center gap-2 min-w-[500px] px-2 relative py-2">
+                <div class="absolute h-1 bg-slate-200 left-8 right-8 top-1/2 -translate-y-1/2 z-0"></div>
+                <div id="progress-line" class="absolute h-1 bg-indigo-500 left-8 top-1/2 -translate-y-1/2 z-0 transition-all duration-500" style="width: 0%"></div>
+                
+                <div class="level-node z-10 current" id="node-1" onclick="jumpToLevel(1)">1</div>
+                <div class="level-node z-10 locked" id="node-2" onclick="jumpToLevel(2)">2</div>
+                <div class="level-node z-10 locked" id="node-3" onclick="jumpToLevel(3)">3</div>
+                <div class="level-node z-10 locked" id="node-4" onclick="jumpToLevel(4)">4</div>
+                <div class="level-node z-10 locked" id="node-5" onclick="jumpToLevel(5)">5</div>
+                <div class="level-node z-10 locked" id="node-6" onclick="jumpToLevel(6)">6</div>
+                <div class="level-node z-10 locked" id="node-7" onclick="jumpToLevel(7)">7</div>
+                <div class="level-node z-10 locked" id="node-8" onclick="jumpToLevel(8)">8</div>
+                <div class="level-node z-10 locked" id="node-9" onclick="jumpToLevel(9)">9</div>
+                <div class="level-node z-10 locked" id="node-10" onclick="jumpToLevel(10)">10</div>
+            </div>
+        </div>
+
+        <div class="relative">
+            <!-- FROG GAME -->
+            <div id="game-frog" class="game-container active bg-white rounded-[32px] p-6 shadow-xl border-8 border-indigo-100 min-h-[550px]">
+                <div class="flex flex-col lg:flex-row gap-6">
+                    <div class="flex-1 flex flex-col items-center">
+                        <div class="text-center mb-4">
+                            <h2 class="text-xl font-black text-slate-800 uppercase tracking-tight">Kurbağayı Kurtar!</h2>
+                            <p class="text-slate-500 text-xs font-bold" id="frog-level-info">Seviye 1/10</p>
+                        </div>
+                        <div id="frog-grid" class="grid gap-1.5 mb-4 p-3 bg-slate-50 rounded-2xl shadow-inner overflow-auto max-w-full"></div>
+                        
+                        <div class="grid grid-cols-3 gap-2">
+                            <div></div>
+                            <button onclick="addCommand('up')" class="h-10 w-10 bg-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-colors"><i class="fas fa-arrow-up"></i></button>
+                            <div></div>
+                            <button onclick="addCommand('left')" class="h-10 w-10 bg-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-colors"><i class="fas fa-arrow-left"></i></button>
+                            <button onclick="addCommand('down')" class="h-10 w-10 bg-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-colors"><i class="fas fa-arrow-down"></i></button>
+                            <button onclick="addCommand('right')" class="h-10 w-10 bg-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-colors"><i class="fas fa-arrow-right"></i></button>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 flex flex-col">
+                        <div class="bg-slate-800 rounded-2xl p-4 flex flex-col h-full min-h-[300px]">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-indigo-300 font-bold text-xs tracking-widest uppercase"><i class="fas fa-code mr-2"></i>Algoritma Paneli</span>
+                                <button onclick="clearCommands()" class="text-slate-400 text-[10px] hover:text-white uppercase font-bold">Temizle</button>
+                            </div>
+                            <div id="command-list" class="flex flex-wrap content-start gap-1.5 flex-1 p-2 bg-slate-900/50 rounded-xl border border-slate-700 overflow-y-auto">
+                                <p id="empty-hint" class="text-slate-600 text-[10px] italic m-auto">Komut ekleyerek rotanı belirle!</p>
+                            </div>
+                            <button id="btn-run" onclick="runAlgorithm()" class="mt-4 w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-black shadow-lg transition-all flex items-center justify-center gap-2">
+                                <i class="fas fa-play"></i> ÇALIŞTIR
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="success-frog" class="success-overlay">
+                    <div class="text-5xl mb-3">🎉</div>
+                    <h3 class="text-2xl font-black text-indigo-600 mb-1">MUHTEŞEM!</h3>
+                    <p class="text-slate-600 mb-4 font-bold text-sm">Gölün suları çok serin!</p>
+                    <button onclick="nextLevel()" class="bg-indigo-600 text-white px-8 py-3 rounded-xl font-black shadow-xl hover:bg-indigo-700 transition-all">DEVAM ET <i class="fas fa-arrow-right ml-2"></i></button>
+                </div>
+            </div>
+
+            <!-- SHAPES GAME -->
+            <div id="game-shapes" class="game-container hidden bg-white rounded-[32px] p-6 shadow-xl border-8 border-indigo-100 flex flex-col items-center">
+                <div class="text-center mb-4">
+                    <h2 class="text-xl font-black text-slate-800 uppercase tracking-tight">Robot Fabrikası</h2>
+                    <p class="text-slate-500 text-xs font-bold" id="shapes-level-info">Robot No: 1</p>
+                </div>
+                <div class="flex flex-wrap justify-center gap-2 mb-8">
+                    <div class="color-dot bg-red-500" onclick="selectColor('red', this)"></div>
+                    <div class="color-dot bg-sky-500" onclick="selectColor('skyblue', this)"></div>
+                    <div class="color-dot bg-yellow-400" onclick="selectColor('yellow', this)"></div>
+                    <div class="color-dot bg-green-500" onclick="selectColor('green', this)"></div>
+                    <div class="color-dot bg-fuchsia-500" onclick="selectColor('fuchsia', this)"></div>
+                    <div class="color-dot bg-orange-500" onclick="selectColor('orange', this)"></div>
+                    <div class="color-dot bg-slate-400" onclick="selectColor('gray', this)"></div>
+                    <div class="color-dot bg-purple-600" onclick="selectColor('purple', this)"></div>
+                </div>
+                <div id="robot-container" class="bg-slate-50 p-4 rounded-2xl border-2 border-dashed border-slate-200"></div>
+                <div id="success-shapes" class="success-overlay">
+                    <div class="text-5xl mb-3">🤖</div>
+                    <h3 class="text-2xl font-black text-emerald-600 mb-1">HARİKA BOYAMA!</h3>
+                    <button onclick="nextLevel()" class="bg-emerald-600 text-white px-8 py-3 rounded-xl font-black shadow-xl">YENİ ROBOT <i class="fas fa-arrow-right ml-2"></i></button>
+                </div>
+            </div>
+
+            <!-- LOGIC GAME -->
+            <div id="game-logic" class="game-container hidden bg-white rounded-[32px] p-6 shadow-xl border-8 border-indigo-100 flex flex-col items-center">
+                <div class="text-center mb-4">
+                    <h2 class="text-xl font-black text-slate-800 uppercase tracking-tight">Şifre Çözücü</h2>
+                    <p class="text-slate-500 text-xs font-bold" id="logic-level-info">Şifre: 1/10</p>
+                </div>
+                <div id="logic-key-area" class="bg-amber-50 border-2 border-amber-200 p-4 rounded-2xl mb-6 flex flex-wrap justify-center gap-4 shadow-sm w-full"></div>
+                <div id="logic-svg-area" class="mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-200"></div>
+                <div id="success-logic" class="success-overlay">
+                    <div class="text-5xl mb-3">🚀</div>
+                    <h3 class="text-2xl font-black text-amber-600 mb-1">ŞİFRE ÇÖZÜLDÜ!</h3>
+                    <button onclick="nextLevel()" class="bg-amber-600 text-white px-8 py-3 rounded-xl font-black shadow-xl">YENİ GÖREV <i class="fas fa-arrow-right ml-2"></i></button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- State Management ---
+        let state = {
+            activeTab: 'frog',
+            score: 0,
+            unlocked: { frog: 1, shapes: 1, logic: 1 },
+            currentLevel: { frog: 1, shapes: 1, logic: 1 },
+            selectedColor: null,
+            frogPos: [0,0],
+            commands: [],
+            isRunning: false
+        };
+
+        // --- Configs (10 Levels Each) ---
+        const config = {
+            frog: [
+                { grid: [5,2], start: [0,0], target: [4,1], rocks: [] },
+                { grid: [5,4], start: [0,0], target: [4,3], rocks: [[2,1], [2,2]] },
+                { grid: [6,5], start: [0,0], target: [5,4], rocks: [[1,1], [3,1], [1,3], [3,3], [4,1]] },
+                { grid: [7,5], start: [0,0], target: [6,0], rocks: [[1,0], [1,1], [1,2], [3,2], [3,3], [3,4], [5,0], [5,1]] },
+                { grid: [8,6], start: [0,5], target: [7,0], rocks: [[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[1,2],[1,3],[1,4],[3,1],[3,2],[3,3],[5,2],[5,3],[5,4],[5,5]] },
+                { grid: [8,8], start: [0,0], target: [7,7], rocks: [[1,1],[1,2],[1,3],[3,1],[3,3],[3,4],[3,5],[5,1],[5,3],[5,5],[5,6],[5,7]] },
+                { grid: [10,6], start: [0,0], target: [9,5], rocks: [[1,0],[1,1],[3,1],[3,2],[3,3],[5,3],[5,4],[5,5],[7,0],[7,1],[7,2],[7,3]] },
+                { grid: [10,10], start: [0,0], target: [9,9], rocks: [[0,1],[1,1],[2,1],[3,1],[4,1],[5,1],[6,1],[7,1],[8,1],[8,3],[7,3],[6,3],[5,3],[4,3],[3,3],[2,3],[1,3],[1,5],[2,5],[3,5],[4,5],[5,5],[6,5],[7,5],[8,5]] },
+                { grid: [12,8], start: [0,0], target: [11,7], rocks: [[2,0],[2,1],[2,2],[2,3],[5,4],[5,5],[5,6],[5,7],[8,0],[8,1],[8,2],[8,3]] },
+                { grid: [12,12], start: [0,11], target: [11,0], rocks: [[1,1],[2,2],[3,3],[4,4],[5,5],[6,6],[7,7],[8,8],[9,9],[10,10]] }
+            ],
+            logic: [
+                { keys: [{s: '●', n: 'Sarı', c: 'yellow'}, {s: '■', n: 'Pembe', c: 'pink'}] },
+                { keys: [{s: '▲', n: 'Mavi', c: 'skyblue'}, {s: '★', n: 'Yeşil', c: 'green'}] },
+                { keys: [{s: '●', n: 'Pembe', c: 'pink'}, {s: '◆', n: 'Turuncu', c: 'orange'}, {s: '★', n: 'Mavi', c: 'skyblue'}] },
+                { keys: [{s: '⬢', n: 'Mor', c: 'fuchsia'}, {s: '■', n: 'Yeşil', c: 'green'}, {s: '▲', n: 'Sarı', c: 'yellow'}] },
+                { keys: [{s: '☁', n: 'Gümüş', c: 'silver'}, {s: '●', n: 'Mavi', c: 'skyblue'}, {s: '◆', n: 'Pembe', c: 'pink'}, {s: '★', n: 'Mor', c: 'fuchsia'}] },
+                { keys: [{s: '★', n: 'Sarı', c: 'yellow'}, {s: '■', n: 'Mavi', c: 'skyblue'}, {s: '▲', n: 'Pembe', c: 'pink'}, {s: '⬢', n: 'Turuncu', c: 'orange'}, {s: '◆', n: 'Yeşil', c: 'green'}] },
+                { keys: [{s: '●', n: 'Gri', c: 'gray'}, {s: '■', n: 'Mor', c: 'purple'}, {s: '▲', n: 'Kırmızı', c: 'red'}, {s: '★', n: 'Yeşil', c: 'green'}, {s: '◆', n: 'Turuncu', c: 'orange'}] },
+                { keys: [{s: '☁', n: 'Mavi', c: 'skyblue'}, {s: '⬢', n: 'Pembe', c: 'pink'}, {s: '◆', n: 'Sarı', c: 'yellow'}, {s: '●', n: 'Gümüş', c: 'silver'}, {s: '■', n: 'Mor', c: 'purple'}, {s: '▲', n: 'Turuncu', c: 'orange'}] },
+                { keys: [{s: '★', n: 'Kırmızı', c: 'red'}, {s: '☁', n: 'Yeşil', c: 'green'}, {s: '■', n: 'Sarı', c: 'yellow'}, {s: '▲', n: 'Pembe', c: 'pink'}, {s: '●', n: 'Mavi', c: 'skyblue'}, {s: '⬢', n: 'Turuncu', c: 'orange'}, {s: '◆', n: 'Mor', c: 'purple'}] },
+                { keys: [{s: '●', n: 'Mavi', c: 'skyblue'}, {s: '■', n: 'Yeşil', c: 'green'}, {s: '▲', n: 'Sarı', c: 'yellow'}, {s: '★', n: 'Pembe', c: 'pink'}, {s: '◆', n: 'Turuncu', c: 'orange'}, {s: '⬢', n: 'Mor', c: 'fuchsia'}, {s: '☁', n: 'Gümüş', c: 'silver'}, {s: '⬟', n: 'Kırmızı', c: 'red'}] }
+            ]
+        };
+
+        // --- Core UI Logic ---
+        function switchTab(tab) {
+            state.activeTab = tab;
+            document.querySelectorAll('.game-container').forEach(c => c.classList.add('hidden'));
+            document.getElementById(`game-${tab}`).classList.remove('hidden');
+            ['frog', 'shapes', 'logic'].forEach(t => {
+                const btn = document.getElementById(`tab-${t}`);
+                btn.className = `flex-1 min-w-[100px] py-3 rounded-xl font-bold flex flex-col items-center gap-1 transition-all ${t === tab ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-white'}`;
+            });
+            updateProgressUI();
+            initCurrentGame();
+        }
+
+        function updateProgressUI() {
+            const current = state.currentLevel[state.activeTab];
+            const unlocked = state.unlocked[state.activeTab];
+            for(let i=1; i<=10; i++) {
+                const node = document.getElementById(`node-${i}`);
+                if(!node) continue;
+                node.className = `level-node z-10`;
+                node.innerHTML = i;
+                if(i > unlocked) {
+                    node.classList.add('locked');
+                    node.innerHTML = '<i class="fas fa-lock text-[8px]"></i>';
+                } else if (i === current) {
+                    node.classList.add('current', 'bg-indigo-100', 'text-indigo-700');
+                } else {
+                    node.classList.add('bg-white', 'text-slate-400', 'border-2', 'border-slate-100');
+                }
+            }
+            document.getElementById('progress-line').style.width = `${((unlocked - 1) / 9) * 100}%`;
+        }
+
+        function jumpToLevel(lvl) {
+            if(lvl > state.unlocked[state.activeTab]) {
+                msg("Bu seviyeye henüz ulaşamadın!", "error");
+                return;
+            }
+            if(state.isRunning) return;
+            state.currentLevel[state.activeTab] = lvl;
+            updateProgressUI();
+            initCurrentGame();
+            document.querySelectorAll('.success-overlay').forEach(o => o.style.display = 'none');
+        }
+
+        function initCurrentGame() {
+            state.selectedColor = null;
+            state.isRunning = false;
+            if(state.activeTab === 'frog') initFrog();
+            if(state.activeTab === 'shapes') initShapes();
+            if(state.activeTab === 'logic') initLogic();
+        }
+
+        // --- Frog Game (Coding) ---
+        function initFrog() {
+            const lvl = config.frog[state.currentLevel.frog - 1];
+            const grid = document.getElementById('frog-grid');
+            document.getElementById('frog-level-info').innerText = `Seviye ${state.currentLevel.frog}/10`;
+            grid.style.gridTemplateColumns = `repeat(${lvl.grid[0]}, 1fr)`;
+            grid.innerHTML = '';
+            state.frogPos = [...lvl.start];
+            state.commands = [];
+            renderCommandsUI();
+            
+            for(let y=0; y<lvl.grid[1]; y++) {
+                for(let x=0; x<lvl.grid[0]; x++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'grid-cell w-10 h-10 sm:w-12 sm:h-12';
+                    cell.id = `f-${x}-${y}`;
+                    const isRock = lvl.rocks.some(r => r[0] === x && r[1] === y);
+                    if(isRock) { cell.classList.add('obstacle'); cell.innerHTML = '🪨'; }
+                    if(x === lvl.target[0] && y === lvl.target[1]) { cell.classList.add('target'); cell.innerHTML = '🌊'; }
+                    grid.appendChild(cell);
+                }
+            }
+            renderFrog();
+        }
+
+        function renderFrog() {
+            document.querySelectorAll('#frog-grid .grid-cell').forEach(c => {
+                const idParts = c.id.split('-');
+                const tx = parseInt(idParts[1]), ty = parseInt(idParts[2]);
+                const lvl = config.frog[state.currentLevel.frog - 1];
+                c.querySelectorAll('.ghost-dot, .ghost-error').forEach(el => el.remove());
+                if(tx === lvl.target[0] && ty === lvl.target[1]) c.innerHTML = '🌊';
+                else if(!c.classList.contains('obstacle')) c.innerHTML = '';
+            });
+            const curCell = document.getElementById(`f-${state.frogPos[0]}-${state.frogPos[1]}`);
+            const lvl = config.frog[state.currentLevel.frog - 1];
+            if(state.frogPos[0] === lvl.target[0] && state.frogPos[1] === lvl.target[1]) curCell.innerHTML = '🐸✨';
+            else curCell.innerHTML = '🐸';
+            if(!state.isRunning) renderGhostPath();
+        }
+
+        function renderGhostPath() {
+            const lvl = config.frog[state.currentLevel.frog - 1];
+            let tempPos = [...lvl.start];
+            state.commands.forEach((cmd) => {
+                let [nx, ny] = [...tempPos];
+                if(cmd === 'up') ny--; if(cmd === 'down') ny++; if(cmd === 'left') nx--; if(cmd === 'right') nx++;
+                const cell = document.getElementById(`f-${nx}-${ny}`);
+                if(cell) {
+                    const isRock = lvl.rocks.some(r => r[0] === nx && r[1] === ny);
+                    if(!isRock) {
+                        if(!cell.querySelector('.ghost-dot')) {
+                            const dot = document.createElement('div'); dot.className = 'ghost-dot'; cell.appendChild(dot);
+                        }
+                        tempPos = [nx, ny];
+                    } else {
+                        if(!cell.querySelector('.ghost-error')) {
+                            const err = document.createElement('div'); err.className = 'ghost-error'; err.innerHTML = '✖'; cell.appendChild(err);
+                        }
+                    }
+                } else {
+                    const lastValid = document.getElementById(`f-${tempPos[0]}-${tempPos[1]}`);
+                    if(lastValid && !lastValid.querySelector('.ghost-error')) {
+                        const err = document.createElement('div'); err.className = 'ghost-error'; err.innerHTML = '⚠'; lastValid.appendChild(err);
+                    }
+                }
+            });
+        }
+
+        function addCommand(dir) {
+            if(state.isRunning) return;
+            state.commands.push(dir);
+            renderCommandsUI();
+            renderFrog();
+        }
+
+        function removeCommand(index) {
+            if(state.isRunning) return;
+            state.commands.splice(index, 1);
+            renderCommandsUI();
+            renderFrog();
+        }
+
+        function clearCommands() {
+            if(state.isRunning) return;
+            state.commands = [];
+            renderCommandsUI();
+            const lvl = config.frog[state.currentLevel.frog - 1];
+            state.frogPos = [...lvl.start];
+            renderFrog();
+        }
+
+        function renderCommandsUI() {
+            const list = document.getElementById('command-list');
+            list.innerHTML = '';
+            if(state.commands.length === 0) {
+                list.innerHTML = '<p id="empty-hint" class="text-slate-600 text-[10px] italic m-auto">Yön butonlarına bas!</p>';
+                return;
+            }
+            state.commands.forEach((cmd, index) => {
+                const block = document.createElement('div');
+                block.className = 'code-block';
+                const icon = cmd === 'up' ? 'arrow-up' : cmd === 'down' ? 'arrow-down' : cmd === 'left' ? 'arrow-left' : 'arrow-right';
+                block.innerHTML = `<i class="fas fa-${icon}"></i> <button onclick="removeCommand(${index})">✖</button>`;
+                list.appendChild(block);
+            });
+        }
+
+        async function runAlgorithm() {
+            if(state.isRunning || state.commands.length === 0) return;
+            state.isRunning = true;
+            const lvl = config.frog[state.currentLevel.frog - 1];
+            state.frogPos = [...lvl.start];
+            document.querySelectorAll('.ghost-dot, .ghost-error').forEach(el => el.remove());
+            const blocks = document.querySelectorAll('.code-block');
+            for(let i=0; i < state.commands.length; i++) {
+                const cmd = state.commands[i];
+                blocks.forEach(b => b.classList.remove('ring-4', 'ring-emerald-400'));
+                blocks[i].classList.add('ring-4', 'ring-emerald-400');
+                await new Promise(r => setTimeout(r, 600));
+                let [nx, ny] = [...state.frogPos];
+                if(cmd === 'up') ny--; if(cmd === 'down') ny++; if(cmd === 'left') nx--; if(cmd === 'right') nx++;
+                const isRock = lvl.rocks.some(r => r[0] === nx && r[1] === ny);
+                if(nx >= 0 && nx < lvl.grid[0] && ny >= 0 && ny < lvl.grid[1] && !isRock) {
+                    state.frogPos = [nx, ny];
+                    renderFrog();
+                    if(state.frogPos[0] === lvl.target[0] && state.frogPos[1] === lvl.target[1]) {
+                        finishLevel('frog'); state.isRunning = false; return;
+                    }
+                } else {
+                    msg("Hata! Algoritma engelle karşılaştı.", "error"); state.isRunning = false; renderFrog(); return;
+                }
+            }
+            state.isRunning = false; msg("Hedefe ulaşılamadı. Algoritmayı gözden geçir!", "info"); renderFrog();
+        }
+
+        // --- Robot Game (Design) ---
+        function initShapes() {
+            const container = document.getElementById('robot-container');
+            const lvl = state.currentLevel.shapes;
+            document.getElementById('shapes-level-info').innerText = `Robot No: ${lvl}/10`;
+            let svg = `<svg width="240" height="300" viewBox="0 0 240 300">`;
+            // Seviyeye göre robot şablonları (basitten karmaşığa)
+            if(lvl <= 2) {
+                svg += `<rect x="70" y="20" width="100" height="80" rx="15" fill="white" class="robot-part" onclick="paint(this)"/><rect x="45" y="110" width="150" height="140" rx="25" fill="white" class="robot-part" onclick="paint(this)"/>`;
+            } else if(lvl <= 4) {
+                svg += `<rect x="85" y="20" width="70" height="60" rx="10" fill="white" class="robot-part" onclick="paint(this)"/><rect x="70" y="90" width="100" height="100" rx="15" fill="white" class="robot-part" onclick="paint(this)"/><rect x="25" y="100" width="35" height="80" rx="10" fill="white" class="robot-part" onclick="paint(this)"/><rect x="180" y="100" width="35" height="80" rx="10" fill="white" class="robot-part" onclick="paint(this)"/>`;
+            } else if(lvl <= 6) {
+                svg += `<circle cx="120" cy="50" r="40" fill="white" class="robot-part" onclick="paint(this)"/><rect x="60" y="100" width="120" height="120" rx="20" fill="white" class="robot-part" onclick="paint(this)"/><rect x="70" y="230" width="40" height="60" rx="10" fill="white" class="robot-part" onclick="paint(this)"/><rect x="130" y="230" width="40" height="60" rx="10" fill="white" class="robot-part" onclick="paint(this)"/>`;
+            } else {
+                svg += `<path d="M120 10 L160 80 L80 80 Z" fill="white" class="robot-part" onclick="paint(this)"/><rect x="60" y="90" width="120" height="130" rx="10" fill="white" class="robot-part" onclick="paint(this)"/><rect x="10" y="100" width="40" height="100" rx="20" fill="white" class="robot-part" onclick="paint(this)"/><rect x="190" y="100" width="40" height="100" rx="20" fill="white" class="robot-part" onclick="paint(this)"/><rect x="75" y="230" width="30" height="60" fill="white" class="robot-part" onclick="paint(this)"/><rect x="135" y="230" width="30" height="60" fill="white" class="robot-part" onclick="paint(this)"/>`;
+            }
+            container.innerHTML = svg + `</svg>`;
+        }
+
+        function paint(el) {
+            if(!state.selectedColor) { msg("Önce bir renk seçmelisin!", "error"); return; }
+            el.style.fill = state.selectedColor;
+            const parts = document.querySelectorAll('#robot-container .robot-part');
+            if(Array.from(parts).every(p => p.style.fill !== '' && p.style.fill !== 'white')) finishLevel('shapes');
+        }
+
+        // --- Logic Game (Encryption) ---
+        function initLogic() {
+            const lvlData = config.logic[state.currentLevel.logic - 1];
+            const keyArea = document.getElementById('logic-key-area');
+            const svgArea = document.getElementById('logic-svg-area');
+            document.getElementById('logic-level-info').innerText = `Şifre Seviyesi ${state.currentLevel.logic}/10`;
+            keyArea.innerHTML = '';
+            lvlData.keys.forEach(k => {
+                const item = document.createElement('div');
+                item.className = "flex flex-col items-center p-3 rounded-2xl bg-white shadow-sm border border-slate-100 min-w-[100px]";
+                item.innerHTML = `<span class="text-4xl font-bold mb-1">${k.s}</span><div class="logic-label" style="background:${k.c === 'yellow'?'#ca8a04':k.c === 'pink'?'#db2777':k.c === 'skyblue'?'#0284c7':k.c === 'green'?'#059669':k.c === 'orange'?'#ea580c':k.c === 'fuchsia'?'#c026d3':k.c === 'red'?'#b91c1c':k.c === 'purple'?'#7c3aed':'#475569'}">${k.n}</div>`;
+                item.onclick = () => selectColor(k.c, item.querySelector('div'));
+                keyArea.appendChild(item);
+            });
+
+            // Karıştırılmış Şekilleri Çiz (Daha Büyük)
+            let svg = `<svg width="320" height="320" viewBox="0 0 320 320">`;
+            for(let i=0; i < lvlData.keys.length; i++) {
+                const k = lvlData.keys[i];
+                const cx = 60 + (i % 3) * 100;
+                const cy = 60 + Math.floor(i / 3) * 110;
+                const s = 45; // Şekil boyutu (büyütüldü)
+                
+                if(k.s === '●') svg += `<circle cx="${cx}" cy="${cy}" r="${s}" fill="white" class="robot-part" data-shape="${k.c}" onclick="checkLogic(this)"/>`;
+                else if(k.s === '■') svg += `<rect x="${cx-s}" y="${cy-s}" width="${s*2}" height="${s*2}" rx="8" fill="white" class="robot-part" data-shape="${k.c}" onclick="checkLogic(this)"/>`;
+                else if(k.s === '▲') svg += `<polygon points="${cx},${cy-s-5} ${cx-s-5},${cy+s} ${cx+s+5},${cy+s}" fill="white" class="robot-part" data-shape="${k.c}" onclick="checkLogic(this)"/>`;
+                else if(k.s === '★') svg += `<path d="M${cx} ${cy-s} L${cx+12} ${cy-12} L${cx+s} ${cy-12} L${cx+18} ${cy+12} L${cx+30} ${cy+s} L${cx} ${cy+22} L${cx-30} ${cy+s} L${cx-18} ${cy+12} L${cx-s} ${cy-12} L${cx-12} ${cy-12} Z" fill="white" class="robot-part" data-shape="${k.c}" onclick="checkLogic(this)"/>`;
+                else if(k.s === '◆') svg += `<rect x="${cx-s+5}" y="${cy-s+5}" width="${(s-5)*2}" height="${(s-5)*2}" transform="rotate(45 ${cx} ${cy})" fill="white" class="robot-part" data-shape="${k.c}" onclick="checkLogic(this)"/>`;
+                else if(k.s === '⬢') svg += `<polygon points="${cx},${cy-s} ${cx+s},${cy-s/2} ${cx+s},${cy+s/2} ${cx},${cy+s} ${cx-s},${cy+s/2} ${cx-s},${cy-s/2}" fill="white" class="robot-part" data-shape="${k.c}" onclick="checkLogic(this)"/>`;
+                else if(k.s === '☁') svg += `<path d="M${cx-s} ${cy+10} a25 25 0 1 1 25 -35 a30 30 0 1 1 45 5 a25 25 0 1 1 -15 45 z" fill="white" class="robot-part" data-shape="${k.c}" onclick="checkLogic(this)"/>`;
+                else if(k.s === '⬟') svg += `<polygon points="${cx},${cy-s} ${cx+s},${cy-s/4} ${cx+s/1.5},${cy+s} ${cx-s/1.5},${cy+s} ${cx-s},${cy-s/4}" fill="white" class="robot-part" data-shape="${k.c}" onclick="checkLogic(this)"/>`;
+                
+                svg += `<text x="${cx}" y="${cy+10}" font-size="28" font-weight="bold" text-anchor="middle" pointer-events="none">${k.s}</text>`;
+            }
+            svgArea.innerHTML = svg + `</svg>`;
+        }
+
+        function checkLogic(el) {
+            if(!state.selectedColor) { msg("Önce bir renk seçmelisin!", "error"); return; }
+            const targetColor = el.getAttribute('data-shape');
+            if(targetColor === state.selectedColor) {
+                el.style.fill = state.selectedColor;
+                msg("Şifre Doğru!", "success"); addScore(20);
+                const parts = document.querySelectorAll('#logic-svg-area .robot-part');
+                if(Array.from(parts).every(p => p.style.fill !== '' && p.style.fill !== 'white')) finishLevel('logic');
+            } else msg("Koda tekrar bak!", "error");
+        }
+
+        // --- Helpers ---
+        function selectColor(color, el) {
+            state.selectedColor = color;
+            document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+            if(el && el.classList.contains('color-dot')) el.classList.add('active');
+            msg(`${color.toUpperCase()} seçildi.`);
+        }
+
+        function addScore(pts) {
+            state.score += pts;
+            document.getElementById('total-score').innerText = `${state.score} Puan`;
+        }
+
+        function finishLevel(type) {
+            addScore(100);
+            setTimeout(() => { document.getElementById(`success-${type}`).style.display = 'flex'; }, 500);
+        }
+
+        function nextLevel() {
+            const type = state.activeTab;
+            if(state.currentLevel[type] < 10) {
+                state.currentLevel[type]++;
+                if(state.currentLevel[type] > state.unlocked[type]) state.unlocked[type] = state.currentLevel[type];
+                updateProgressUI(); initCurrentGame();
+            } else msg("Tebrikler! Tüm bölümleri tamamladın.", "success");
+            document.querySelectorAll('.success-overlay').forEach(o => o.style.display = 'none');
+        }
+
+        function msg(text, type='info') {
+            const box = document.getElementById('message');
+            box.innerText = text; box.style.display = 'block';
+            box.style.backgroundColor = type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#6366f1';
+            setTimeout(() => box.style.display = 'none', 2000);
+        }
+
+        window.onload = () => { initCurrentGame(); updateProgressUI(); };
+    </script>
+</body>
+</html>
